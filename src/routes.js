@@ -89,7 +89,7 @@ routes.get("/payment/token", async (req, res) => {
     });
   } catch (error) {
     console.log(error);
-    res.status(500).send(error);
+    return res.status(500).send(error);
   }
 });
 
@@ -114,7 +114,7 @@ routes.post("/payment/token", async (req, res) => {
     );
     const accessToken = authenticationResponse["data"]["access_token"];
     const paymentResponse = await axios.post(
-      `${process.env.RS_ENDPOINT}/open-banking/v3.1/pisp/domestic-payment-consents`,
+      `${process.env.RS_ENDPOINT}/open-banking/v3.1/pisp/domestic-payments`,
       {
         Data: {
           ConsentId: consentId,
@@ -133,14 +133,13 @@ routes.post("/payment/token", async (req, res) => {
         },
       }
     );
-    console.log(paymentResponse);
     const { Status: status } = paymentResponse.data["Data"];
     if (status !== "AcceptedSettlementCompleted")
       return res.status(400).json("Operação inválida");
     return res.send(paymentResponse.data["Data"]);
   } catch (error) {
     console.log(error);
-    res.status(500).send(error);
+    return res.status(500).send(error);
   }
 });
 
