@@ -143,4 +143,83 @@ routes.post("/payment/token", async (req, res) => {
   }
 });
 
+routes.get("/account/token", async (req, res) => {
+  const params = new URLSearchParams();
+  params.append("grant_type", "client_credentials");
+  params.append("scope", "accounts openid");
+  try {
+    const credentialResponse = await axios.post(
+      process.env.TOKEN_ENDPOINT,
+      params,
+      {
+        httpsAgent,
+        headers: {
+          Authorization: `Basic ${process.env.BASIC_TOKEN}`,
+        },
+      }
+    );
+    const accessToken = credentialResponse["data"]["access_token"];
+    const consentResponse = await axios.post(
+      `${process.env.RS_ENDPOINT}/open-banking/v3.1/aisp/account-access-consents`,
+      {
+        Data: {
+          Permissions: [
+            "ReadAccountsBasic",
+            "ReadAccountsDetail",
+            "ReadBalances",
+            "ReadBeneficiariesBasic",
+            "ReadBeneficiariesDetail",
+            "ReadDirectDebits",
+            "ReadTransactionsBasic",
+            "ReadTransactionsCredits",
+            "ReadTransactionsDebits",
+            "ReadTransactionsDetail",
+            "ReadProducts",
+            "ReadStandingOrdersDetail",
+            "ReadProducts",
+            "ReadStandingOrdersDetail",
+            "ReadStatementsDetail",
+            "ReadParty",
+            "ReadOffers",
+            "ReadScheduledPaymentsBasic",
+            "ReadScheduledPaymentsDetail",
+            "ReadPartyPSU",
+          ],
+        },
+        Risk: {},
+      },
+      {
+        httpsAgent,
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+          "x-fapi-financial-id": process.env.PARTICIPANT_ID,
+          "x-fapi-interaction-id": uuidv4(),
+        },
+      }
+    );
+    const { ConsentId: consentId, Status: status } = consentResponse.data[
+      "Data"
+    ];
+    if (status !== "AwaitingAuthorisation")
+      return res.status(400).json("Operação inválida");
+    const urlAuthentication = await axios.get(
+      `${process.env.RS_ENDPOINT}/ozone/v1.0/auth-code-url/${consentId}?scope=accounts&alg=none`,
+      {
+        httpsAgent,
+        headers: {
+          Authorization: `Basic ${process.env.BASIC_TOKEN}`,
+        },
+      }
+    );
+    return res.json({
+      url: urlAuthentication.data,
+      ConsentId: consentId,
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).send(error);
+  }
+});
+
 module.exports = routes;
